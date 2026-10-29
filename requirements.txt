@@ -8,5 +8,4 @@ dbt-core>=1.9,<1.12
 dbt-clickhouse==1.10.3
 sqlglot>=26
 requests>=2.32
-matplotlib>=3.9
 pytest>=8.3
