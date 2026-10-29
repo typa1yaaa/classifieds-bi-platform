@@ -1,0 +1,151 @@
+{
+  "raw_events": 52931093,
+  "table_bytes": 1658459745,
+  "projection_bytes": 460828215,
+  "results": [
+    {
+      "key": "daily_category",
+      "title": "Дневной график по категории",
+      "question": "Контакты по дням в категории \"Автомобили\" за 90 дней",
+      "before": "SELECT toDate(event_time) AS d, countIf(event_type = 'contact') AS c\n           FROM raw.events\n           WHERE category_id = 101 AND event_time >= '2026-06-30 00:00:00'\n           GROUP BY d ORDER BY d",
+      "after": "SELECT event_date AS d, sum(contacts) AS c\n           FROM marts.fct_category_daily\n           WHERE category_id = 101 AND event_date >= '2026-06-30'\n           GROUP BY d ORDER BY d",
+      "technique": "Витрина вместо сырых событий. Ответ отличается на доли процента: сырой запрос считает и повторные доставки",
+      "tolerance": 0.02,
+      "antipattern": false,
+      "before_setup": "",
+      "after_setup": "",
+      "before_m": {
+        "ms": 43.9,
+        "read_rows": 6062080,
+        "read_bytes": 42116311
+      },
+      "after_m": {
+        "ms": 11.9,
+        "read_rows": 218611,
+        "read_bytes": 2623332
+      },
+      "same_answer": true,
+      "speedup": 3.7
+    },
+    {
+      "key": "listing_history",
+      "title": "История одного объявления",
+      "question": "Все события объявления 12345 по дням и типам",
+      "before": "SELECT toDate(event_time) AS d, event_type, count() AS n\n            FROM raw.events WHERE listing_id = 12345\n            GROUP BY d, event_type ORDER BY d, event_type",
+      "after": "SELECT toDate(event_time) AS d, event_type, count() AS n\n            FROM raw.events WHERE listing_id = 12345\n            GROUP BY d, event_type ORDER BY d, event_type",
+      "technique": "Проверка гипотезы \"нужна проекция по listing_id\". Основной ключ уже отсекает >99% строк: listing_id в нем четвертый, но префикс (дата, категория, тип) низкокардинальный, и ClickHouse применяет generic exclusion search. Проекция читает меньше строк, но быстрее не становится — место на диске она не окупает",
+      "tolerance": 0.0,
+      "antipattern": false,
+      "before_setup": "ALTER TABLE raw.events DROP PROJECTION IF EXISTS p_by_listing SETTINGS mutations_sync = 2",
+      "after_setup": "05_projections.sql",
+      "before_m": {
+        "ms": 32.4,
+        "read_rows": 933888,
+        "read_bytes": 4286823
+      },
+      "after_m": {
+        "ms": 18.8,
+        "read_rows": 81920,
+        "read_bytes": 388610
+      },
+      "same_answer": true,
+      "speedup": 1.7
+    },
+    {
+      "key": "dedup",
+      "title": "Контакты без дублей доставки",
+      "question": "Число контактов за сентябрь без повторно доставленных событий",
+      "before": "SELECT count() FROM (\n               SELECT event_id FROM raw.events\n               WHERE event_type = 'contact' AND event_date BETWEEN '2026-09-01' AND '2026-09-27'\n               LIMIT 1 BY event_id)",
+      "after": "SELECT count() FROM staging.stg_events\n           WHERE event_type = 'contact' AND event_date BETWEEN '2026-09-01' AND '2026-09-27'",
+      "technique": "Дедупликация один раз при сборке (ReplacingMergeTree + OPTIMIZE FINAL), а не в каждом запросе",
+      "tolerance": 0.0,
+      "antipattern": false,
+      "before_setup": "",
+      "after_setup": "",
+      "before_m": {
+        "ms": 55.1,
+        "read_rows": 6403428,
+        "read_bytes": 61284013
+      },
+      "after_m": {
+        "ms": 17.2,
+        "read_rows": 4030464,
+        "read_bytes": 10208464
+      },
+      "same_answer": true,
+      "speedup": 3.2
+    },
+    {
+      "key": "unique_users",
+      "title": "Уникальные пользователи за месяц",
+      "question": "Сколько разных пользователей видели объявления в сентябре",
+      "before": "SELECT uniqExact(user_id) FROM raw.events\n           WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'",
+      "after": "SELECT uniqHLL12Merge(users_hll) FROM marts.users_daily_agg\n           WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'",
+      "technique": "Скетч uniqHLL12 в MV на зерне \"день и платформа\" вместо точного подсчета по сырым событиям (погрешность ~1,6%)",
+      "tolerance": 0.02,
+      "antipattern": false,
+      "before_setup": "",
+      "after_setup": "",
+      "before_m": {
+        "ms": 118.9,
+        "read_rows": 8578654,
+        "read_bytes": 51471924
+      },
+      "after_m": {
+        "ms": 9.3,
+        "read_rows": 90,
+        "read_bytes": 8820
+      },
+      "same_answer": true,
+      "speedup": 12.8
+    },
+    {
+      "key": "unique_users_fine",
+      "title": "Антипример: uniq-скетчи на мелком зерне",
+      "question": "Тот же вопрос, но из агрегата \"объявление и день\", где скетч хранится в каждой строке",
+      "before": "SELECT uniqExact(user_id) FROM raw.events\n           WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'",
+      "after": "SELECT uniqMerge(users_uniq) FROM marts.listing_daily_agg\n           WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'",
+      "technique": "Слияние миллионов скетчей дороже, чем точный подсчет: предагрегация помогает, только если зерно подходит вопросу",
+      "tolerance": 0.02,
+      "antipattern": true,
+      "before_setup": "",
+      "after_setup": "",
+      "before_m": {
+        "ms": 117.3,
+        "read_rows": 8578654,
+        "read_bytes": 51471924
+      },
+      "after_m": {
+        "ms": 120.8,
+        "read_rows": 1926480,
+        "read_bytes": 173383200
+      },
+      "same_answer": true,
+      "speedup": 1.0
+    },
+    {
+      "key": "funnel_month",
+      "title": "Воронка по платформам за месяц",
+      "question": "Показы, просмотры и контакты по платформам за сентябрь",
+      "before": "SELECT platform, countIf(event_type = 'impression') AS i, countIf(event_type = 'view') AS v,\n                  countIf(event_type = 'contact') AS c\n           FROM raw.events WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'\n           GROUP BY platform ORDER BY platform",
+      "after": "SELECT platform, sum(impressions) AS i, sum(views) AS v, sum(contacts) AS c\n           FROM marts.fct_platform_daily WHERE event_date BETWEEN '2026-09-01' AND '2026-09-27'\n           GROUP BY platform ORDER BY platform",
+      "technique": "Витрина на зерне вопроса \"день и платформа\" (81 строка за месяц). Ответ меньше на долю дублей доставки",
+      "tolerance": 0.01,
+      "antipattern": false,
+      "before_setup": "",
+      "after_setup": "",
+      "before_m": {
+        "ms": 41.5,
+        "read_rows": 8578654,
+        "read_bytes": 34314616
+      },
+      "after_m": {
+        "ms": 8.2,
+        "read_rows": 540,
+        "read_bytes": 14625
+      },
+      "same_answer": true,
+      "speedup": 5.1
+    }
+  ]
+}
