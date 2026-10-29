@@ -1,0 +1,27 @@
+name: classifieds
+version: "1.0.0"
+config-version: 2
+profile: classifieds
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  as_of_date: "2026-09-28"
+  lookback_days: 3
+
+models:
+  classifieds:
+    staging:
+      +schema: staging
+    marts:
+      +schema: marts
+    dq:
+      +schema: dq
+      +tags: ["dq"]
+
+flags:
+  send_anonymous_usage_stats: false

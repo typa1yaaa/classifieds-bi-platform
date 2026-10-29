@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Сырые события клиентских приложений, как их доставил трекер.
+    tables:
+      - name: events
+        description: >
+          Показы, просмотры, контакты и добавления в избранное. Возможны повторные доставки
+          одного события (тот же event_id, другой ingested_at).
+        columns:
+          - name: event_id
+            description: Ключ события. Не уникален в raw из-за повторной доставки.
+          - name: event_time
+            description: Время события на клиенте, UTC.
+          - name: ingested_at
+            description: Время записи в хранилище.
