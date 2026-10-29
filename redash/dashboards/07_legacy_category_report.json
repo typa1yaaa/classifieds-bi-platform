@@ -1,0 +1,18 @@
+{
+  "name": "Отчет по категориям (устарел)",
+  "tags": ["deprecated"],
+  "audience": "-",
+  "questions": ["Старый отчет, оставлен для демонстрации governance: его находит дашборд Здоровье BI"],
+  "parameters": {},
+  "queries": [
+    {
+      "key": "legacy", "name": "Устарело | контакты по категориям из raw", "file": "legacy_category_report.sql",
+      "data_source": "clickhouse", "schedule": null, "tags": ["deprecated"], "params": [],
+      "visualizations": [{"key": "table", "type": "table", "name": "Table"}]
+    }
+  ],
+  "widgets": [
+    {"viz": "legacy.table", "pos": [0, 0, 6, 10]}
+  ],
+  "simulate_views": false
+}

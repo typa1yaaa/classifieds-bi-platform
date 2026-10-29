@@ -1,0 +1,60 @@
+{
+  "name": "Здоровье BI | использование и стандарты",
+  "tags": ["certified", "governance"],
+  "audience": "BI-команда",
+  "questions": ["Какими дашбордами реально пользуются?", "Что архивировать, что ускорить, где нарушены стандарты?"],
+  "parameters": {},
+  "queries": [
+    {
+      "key": "inventory", "name": "Здоровье BI | инвентаризация", "file": "bi_inventory.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "governance"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"object_type": "Объект", "total": "Всего", "certified": "Сертифицировано",
+                    "certified_share": "Доля сертифицированных"}}
+      ]
+    },
+    {
+      "key": "usage", "name": "Здоровье BI | использование дашбордов за 30 дней", "file": "bi_dashboard_usage.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "governance"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"dashboard": "Дашборд", "views_30d": "Просмотров", "viewers_30d": "Зрителей",
+                    "last_view_at": "Последний просмотр", "is_certified": "Сертифицирован", "verdict": "Вывод"}}
+      ]
+    },
+    {
+      "key": "views", "name": "Здоровье BI | просмотры по дням", "file": "bi_views_daily.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "governance"], "params": [],
+      "visualizations": [
+        {"key": "chart", "type": "chart", "name": "Просмотры дашбордов по дням", "chart": "column", "x": "day",
+         "y": ["views"], "series": "dashboard", "stacking": "stack"}
+      ]
+    },
+    {
+      "key": "slow", "name": "Здоровье BI | медленные запросы", "file": "bi_slow_queries.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "governance"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"query": "Запрос", "data_source": "Источник", "runs": "Запусков",
+                    "avg_runtime_s": "Среднее время, с", "max_runtime_s": "Максимум, с"}}
+      ]
+    },
+    {
+      "key": "violations", "name": "Здоровье BI | запросы в обход витрин", "file": "bi_standards_violations.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "governance"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"query": "Запрос", "owner": "Автор", "violation": "Нарушение", "updated_at": "Изменен"}}
+      ]
+    }
+  ],
+  "widgets": [
+    {"text": "### BI как продукт\nМетаданные самого Redash (дашборды, запросы, просмотры, время выполнения) читаются через Trino. Дашборд, который почти не открывают, - кандидат на архивацию. Запрос к `raw.*` или `staging.*` - нарушение стандарта: официальные отчеты строятся только на сертифицированных витринах.", "pos": [0, 0, 6, 3]},
+    {"viz": "inventory.table", "pos": [0, 3, 2, 6]},
+    {"viz": "usage.table", "pos": [2, 3, 4, 6]},
+    {"viz": "views.chart", "pos": [0, 9, 6, 9]},
+    {"viz": "slow.table", "pos": [0, 18, 3, 8]},
+    {"viz": "violations.table", "pos": [3, 18, 3, 8]}
+  ]
+}
