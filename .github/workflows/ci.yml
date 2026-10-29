@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bi
+          POSTGRES_PASSWORD: bi
+          POSTGRES_DB: marketplace
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bi -d marketplace"
+          --health-interval 5s --health-retries 20
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8
+        env:
+          CLICKHOUSE_USER: bi
+          CLICKHOUSE_PASSWORD: bi
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        ports: ["8123:8123"]
+        options: >-
+          --ulimit nofile=262144:262144
+          --health-cmd "wget -qO- http://localhost:8123/ping || exit 1"
+          --health-interval 5s --health-retries 30
+
+    env:
+      N_LISTINGS: "60000"
+      N_SELLERS: "10000"
+      N_USERS: "150000"
+      EVENTS_SCALE: "2"
+      PG_HOST: localhost
+      PG_HOST_FOR_CH: postgres
+      CH_HOST: localhost
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Генерация и справочники
+        run: |
+          python -m src.generator
+          python -m src.loaders.postgres
+      - name: ClickHouse — схема и события
+        run: python -m src.loaders.clickhouse
+      - name: dbt build (витрины, тесты, DQ)
+        working-directory: dbt
+        run: dbt build --profiles-dir . --full-refresh
+      - name: Федерация (эмуляция Trino) и DWH на PostgreSQL
+        run: |
+          python -m src.analysis.emulate_federation
+          python -m src.analysis.dwh_postgres
+      - name: Тесты
+        run: python -m pytest -q tests
