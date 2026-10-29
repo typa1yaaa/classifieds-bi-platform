@@ -1,0 +1,83 @@
+{
+  "name": "Качество данных | можно ли верить цифрам",
+  "tags": ["certified", "dq"],
+  "audience": "BI-команда, дежурный по данным, все потребители дашбордов",
+  "questions": ["Свежие ли данные и все ли проверки зеленые?", "Это поломка пайплайна или реальное изменение поведения?"],
+  "parameters": {
+    "period": {"type": "date-range", "title": "Период", "value": {"start": "2026-07-01", "end": "2026-09-27"}}
+  },
+  "queries": [
+    {
+      "key": "failed", "name": "Качество | проваленные проверки за последний день", "file": "dq_failed_last_day.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "dq"], "params": [],
+      "visualizations": [
+        {"key": "counter", "type": "counter", "name": "Проваленных проверок сегодня", "value": "failed_checks"}
+      ],
+      "alert": {"name": "Качество данных | есть проваленные проверки", "column": "failed_checks", "op": ">", "value": 0}
+    },
+    {
+      "key": "latest", "name": "Качество | последний статус проверок", "file": "dq_latest_status.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "dq"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"check_name": "Проверка", "last_date": "Дата", "last_status": "Статус", "last_value": "Значение",
+                    "last_threshold": "Порог", "fails_total": "Всего провалов"}}
+      ]
+    },
+    {
+      "key": "volume", "name": "Качество | объем событий против нормы", "file": "dq_volume.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "dq"], "params": ["period"],
+      "visualizations": [
+        {"key": "line", "type": "chart", "name": "События за день и медиана того же дня недели", "chart": "line",
+         "x": "event_date", "y": ["events", "baseline_median"],
+         "labels": {"events": "События за день", "baseline_median": "Медиана того же дня недели"}, "y_format": "0,0"}
+      ]
+    },
+    {
+      "key": "incidents", "name": "Качество | журнал нарушений", "file": "dq_incidents.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "dq"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"check_date": "Дата", "check_name": "Проверка", "status": "Статус", "value": "Значение",
+                    "threshold": "Порог", "details": "Подробности"}}
+      ]
+    },
+    {
+      "key": "reconciliation", "name": "Качество | сверки между системами", "file": "dq_reconciliation.sql",
+      "data_source": "trino", "schedule": 86400, "tags": ["certified", "dq"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"check_name": "Сверка", "systems": "Системы", "violations": "Нарушений"}}
+      ]
+    },
+    {
+      "key": "platform_cr", "name": "Бизнес-сигнал | конверсия по платформам", "file": "platform_cr.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "product"], "params": ["period"],
+      "visualizations": [
+        {"key": "line", "type": "chart", "name": "Конверсия просмотра в контакт по платформам, %", "chart": "line",
+         "x": "event_date", "y": ["cr_pct"], "series": "platform_name"}
+      ]
+    },
+    {
+      "key": "platform_alert", "name": "Бизнес-сигнал | конверсия за 3 дня к базе", "file": "platform_cr_alert.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "product"], "params": [],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"platform_name": "Платформа", "cr_last_3d_pct": "Конверсия за 3 дня, %",
+                    "cr_baseline_28d_pct": "База за 28 дней, %", "ratio": "Отношение"}}
+      ],
+      "alert": {"name": "Продукт | конверсия платформы упала больше чем на 15%", "column": "ratio", "op": "<", "value": 0.85}
+    }
+  ],
+  "widgets": [
+    {"text": "### Сначала проверь данные, потом делай выводы\nВверху - здоровье данных: свежесть, объем, дубли, сверки между системами. Внизу - бизнес-сигнал. Если метрика упала, а проверки зеленые, это изменение поведения пользователей, а не поломка пайплайна.", "pos": [0, 0, 6, 2]},
+    {"viz": "failed.counter", "pos": [0, 2, 2, 6]},
+    {"viz": "latest.table", "pos": [2, 2, 4, 6]},
+    {"viz": "volume.line", "pos": [0, 8, 4, 9]},
+    {"viz": "incidents.table", "pos": [4, 8, 2, 9]},
+    {"viz": "reconciliation.table", "pos": [0, 17, 6, 6]},
+    {"text": "### Бизнес-сигнал\nОбъем событий с iOS в норме, а конверсия в контакт с 10 сентября упала больше чем на треть: это совпало с релизом приложения. Проверки качества зеленые, значит, причина в продукте, а не в данных.", "pos": [0, 23, 6, 2]},
+    {"viz": "platform_cr.line", "pos": [0, 25, 4, 9]},
+    {"viz": "platform_alert.table", "pos": [4, 25, 2, 9]}
+  ]
+}

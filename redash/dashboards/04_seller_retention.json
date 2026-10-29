@@ -1,0 +1,36 @@
+{
+  "name": "Удержание | платящие продавцы",
+  "tags": ["certified", "finance"],
+  "audience": "Руководитель направления продвижения, CRM",
+  "questions": ["Возвращаются ли продавцы за продвижением?", "Какие когорты уходят быстрее?"],
+  "parameters": {},
+  "queries": [
+    {
+      "key": "cohorts", "name": "Удержание | когорты", "file": "seller_retention_cohorts.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": [],
+      "visualizations": [
+        {"key": "curves", "type": "chart", "name": "Кривые удержания когорт, %", "chart": "line",
+         "x": "month_number", "y": ["retention_pct"], "series": "cohort", "x_title": "Месяц жизни когорты",
+         "x_type": "category"},
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"cohort": "Когорта", "month_number": "Месяц", "sellers_in_cohort": "Продавцов в когорте",
+                    "active_sellers": "Активных", "retention_pct": "Удержание, %"}}
+      ]
+    },
+    {
+      "key": "m1", "name": "Удержание | возврат в следующем месяце", "file": "seller_retention_m1.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": [],
+      "visualizations": [
+        {"key": "line", "type": "chart", "name": "Возврат в следующем месяце (M1), %", "chart": "line", "x": "cohort",
+         "y": ["retention_m1_pct"], "labels": {"retention_m1_pct": "M1, %"}, "legend": false,
+         "x_type": "category", "x_title": "Когорта"}
+      ]
+    }
+  ],
+  "widgets": [
+    {"text": "### Удержание\nКогорта - месяц первой оплаты продвижения. Значение - доля продавцов когорты, оплативших продвижение снова через N месяцев.", "pos": [0, 0, 6, 2]},
+    {"viz": "cohorts.curves", "pos": [0, 2, 4, 10]},
+    {"viz": "m1.line", "pos": [4, 2, 2, 10]},
+    {"viz": "cohorts.table", "pos": [0, 12, 6, 8]}
+  ]
+}

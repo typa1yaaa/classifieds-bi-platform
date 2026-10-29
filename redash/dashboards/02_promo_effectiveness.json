@@ -1,0 +1,48 @@
+{
+  "name": "Эффект продвижения | работает ли оно",
+  "tags": ["certified", "product"],
+  "audience": "Руководитель направления продвижения, продакт",
+  "questions": ["Во сколько раз продвижение реально увеличивает контакты?", "Сколько стоит продавцу дополнительный контакт?"],
+  "parameters": {
+    "period": {"type": "date-range", "title": "Старт продвижения", "value": {"start": "2026-04-15", "end": "2026-09-20"}}
+  },
+  "queries": [
+    {
+      "key": "effect", "name": "Продвижение | эффект по услугам", "file": "promo_effect_by_service.sql",
+      "data_source": "clickhouse", "schedule": 86400, "tags": ["certified", "product"], "params": ["period"],
+      "visualizations": [
+        {"key": "chart", "type": "chart", "name": "Во сколько раз растут контакты", "chart": "column",
+         "x": "service", "y": ["uplift_naive", "uplift_before_after"],
+         "labels": {"uplift_naive": "Наивная: продвигаемые / остальные", "uplift_before_after": "Честная: то же объявление до / во время"},
+         "y_format": "0.0"},
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"service": "Услуга", "orders_evaluated": "Заказов в оценке", "uplift_naive": "Наивная оценка",
+                    "uplift_before_after": "Честная оценка", "extra_contacts": "Доп. контакты",
+                    "cost_per_extra_contact_rub": "Руб. за доп. контакт"}}
+      ]
+    },
+    {
+      "key": "cost", "name": "Продвижение | стоимость доп. контакта по категориям", "file": "promo_cost_by_category.sql",
+      "data_source": "clickhouse", "schedule": 86400, "tags": ["certified", "product"], "params": ["period"],
+      "visualizations": [
+        {"key": "bars", "type": "chart", "name": "Руб. за дополнительный контакт", "chart": "column",
+         "x": "category", "y": ["cost_per_extra_contact_rub"], "series": "service", "y_format": "0,0"}
+      ]
+    },
+    {
+      "key": "share", "name": "Продвижение | доля показов", "file": "promo_share_of_impressions.sql",
+      "data_source": "clickhouse", "schedule": 86400, "tags": ["certified", "product"], "params": ["period"],
+      "visualizations": [
+        {"key": "line", "type": "chart", "name": "Доля показов продвигаемых объявлений, %", "chart": "line", "x": "week",
+         "y": ["promoted_share_pct"], "labels": {"promoted_share_pct": "Доля показов, %"}, "legend": false}
+      ]
+    }
+  ],
+  "widgets": [
+    {"text": "### Почему наивная оценка завышает эффект\nПродвигают объявления, которые и так популярнее, поэтому сравнение \"продвигаемые против остальных\" завышает эффект в 2-3 раза. Честная оценка сравнивает **то же объявление** во время продвижения и за 14 дней до него. Данные - результат федеративного запроса Trino по DWH, ClickHouse и PostgreSQL, пересчет раз в сутки.", "pos": [0, 0, 6, 3]},
+    {"viz": "effect.chart", "pos": [0, 3, 3, 9]},
+    {"viz": "effect.table", "pos": [3, 3, 3, 9]},
+    {"viz": "cost.bars", "pos": [0, 12, 3, 10]},
+    {"viz": "share.line", "pos": [3, 12, 3, 10]}
+  ]
+}

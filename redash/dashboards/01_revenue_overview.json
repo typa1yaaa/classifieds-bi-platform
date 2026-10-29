@@ -1,0 +1,55 @@
+{
+  "name": "Выручка | платное продвижение",
+  "tags": ["certified", "finance"],
+  "audience": "Финансовый аналитик, руководитель направления продвижения",
+  "questions": ["Сколько приносит продвижение и как это меняется?", "За счет каких категорий и услуг?"],
+  "parameters": {
+    "period": {"type": "date-range", "title": "Период", "value": {"start": "2026-07-01", "end": "2026-09-27"}}
+  },
+  "queries": [
+    {
+      "key": "revenue_kpi", "name": "Выручка | KPI к прошлому периоду", "file": "revenue_kpi.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": ["period"],
+      "visualizations": [
+        {"key": "revenue", "type": "counter", "name": "Выручка", "value": "revenue", "target": "revenue_prev", "suffix": " руб."},
+        {"key": "sellers", "type": "counter", "name": "Платящие продавцы", "value": "paying_sellers", "target": "paying_sellers_prev"},
+        {"key": "arppu", "type": "counter", "name": "ARPPU", "value": "arppu", "target": "arppu_prev", "suffix": " руб."}
+      ]
+    },
+    {
+      "key": "revenue_trend", "name": "Выручка | по дням и услугам", "file": "revenue_trend.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": ["period"],
+      "visualizations": [
+        {"key": "chart", "type": "chart", "name": "Выручка по дням, руб.", "chart": "column", "x": "order_date",
+         "y": ["revenue"], "series": "service", "stacking": "stack", "y_format": "0,0"}
+      ]
+    },
+    {
+      "key": "revenue_by_category", "name": "Выручка | по категориям", "file": "revenue_by_category.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": ["period"],
+      "visualizations": [
+        {"key": "bars", "type": "chart", "name": "Выручка по категориям, руб.", "chart": "column", "x": "category",
+         "y": ["revenue"], "labels": {"revenue": "Выручка"}, "horizontal": true, "sort_x": false,
+         "legend": false, "y_format": "0,0"}
+      ]
+    },
+    {
+      "key": "revenue_by_seller_type", "name": "Выручка | компании и частные продавцы", "file": "revenue_by_seller_type.sql",
+      "data_source": "vertica", "schedule": 86400, "tags": ["certified", "finance"], "params": ["period"],
+      "visualizations": [
+        {"key": "table", "type": "table", "name": "Table",
+         "titles": {"seller_type": "Тип продавца", "service": "Услуга", "revenue": "Выручка, руб.",
+                    "avg_order_value": "Средний чек, руб."}}
+      ]
+    }
+  ],
+  "widgets": [
+    {"text": "### Выручка платного продвижения\nСравнение с предыдущим периодом такой же длины. Выручка - только оплаченные заказы, возвраты и отмены не входят. Обновление раз в сутки.", "pos": [0, 0, 6, 2]},
+    {"viz": "revenue_kpi.revenue", "pos": [0, 2, 2, 5]},
+    {"viz": "revenue_kpi.sellers", "pos": [2, 2, 2, 5]},
+    {"viz": "revenue_kpi.arppu", "pos": [4, 2, 2, 5]},
+    {"viz": "revenue_trend.chart", "pos": [0, 7, 6, 9]},
+    {"viz": "revenue_by_category.bars", "pos": [0, 16, 3, 9]},
+    {"viz": "revenue_by_seller_type.table", "pos": [3, 16, 3, 9]}
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "name": "Категории | самостоятельный анализ",
+  "tags": ["certified", "self-service"],
+  "audience": "Менеджер категории",
+  "questions": ["Как идут дела в моей категории?", "Где проседает конверсия и сколько дает продвижение?"],
+  "parameters": {
+    "period": {"type": "date-range", "title": "Период", "value": {"start": "2026-08-01", "end": "2026-09-27"}},
+    "category": {"type": "query", "query": "categories_list", "title": "Категория", "multi": true, "quote": "", "value": ["101"]},
+    "platform": {"type": "enum", "title": "Платформа", "options": ["android", "ios", "web"], "multi": true, "quote": "'", "value": ["android", "ios", "web"]}
+  },
+  "queries": [
+    {
+      "key": "categories_list", "name": "Справочник | категории для фильтра", "file": "categories_list.sql",
+      "data_source": "clickhouse", "schedule": 86400, "tags": ["certified", "dictionary"], "params": [],
+      "visualizations": []
+    },
+    {
+      "key": "kpi", "name": "Категории | KPI к прошлому периоду", "file": "category_kpi.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "self-service"],
+      "params": ["period", "category", "platform"],
+      "visualizations": [
+        {"key": "views", "type": "counter", "name": "Просмотры", "value": "views_cur", "target": "views_prev"},
+        {"key": "contacts", "type": "counter", "name": "Контакты", "value": "contacts_cur", "target": "contacts_prev"},
+        {"key": "cr", "type": "counter", "name": "Конверсия просмотра в контакт", "value": "cr_cur_pct",
+         "target": "cr_prev_pct", "suffix": " %", "decimals": 1}
+      ]
+    },
+    {
+      "key": "trend", "name": "Категории | тренд", "file": "category_trend.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "self-service"],
+      "params": ["period", "category", "platform"],
+      "visualizations": [
+        {"key": "contacts", "type": "chart", "name": "Контакты по дням", "chart": "column", "x": "event_date",
+         "y": ["contacts_total"], "labels": {"contacts_total": "Контакты"}, "legend": false},
+        {"key": "cr", "type": "chart", "name": "Конверсия просмотра в контакт, %", "chart": "line", "x": "event_date",
+         "y": ["cr_pct"], "labels": {"cr_pct": "Конверсия, %"}, "legend": false}
+      ]
+    },
+    {
+      "key": "region", "name": "Категории | регионы", "file": "category_by_region.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "self-service"],
+      "params": ["period", "category", "platform"],
+      "visualizations": [
+        {"key": "bars", "type": "chart", "name": "Топ-15 регионов по контактам", "chart": "column", "x": "region",
+         "y": ["contacts_total"], "labels": {"contacts_total": "Контакты"}, "horizontal": true, "sort_x": false,
+         "legend": false}
+      ]
+    },
+    {
+      "key": "promo", "name": "Категории | продвижение и органика", "file": "category_promoted_vs_organic.sql",
+      "data_source": "clickhouse", "schedule": 3600, "tags": ["certified", "self-service"],
+      "params": ["period", "category", "platform"],
+      "visualizations": [
+        {"key": "bars", "type": "chart", "name": "Контакты: продвижение и органика", "chart": "column", "x": "event_date",
+         "y": ["contacts_total"], "series": "traffic", "stacking": "stack"}
+      ]
+    }
+  ],
+  "widgets": [
+    {"text": "### Категория под вашим контролем\nВыберите категории, платформы и период - все графики пересчитаются. Если нужного разреза нет, напишите в канал BI: возможно, его стоит добавить в витрину `marts.fct_category_daily`.", "pos": [0, 0, 6, 2]},
+    {"viz": "kpi.views", "pos": [0, 2, 2, 5]},
+    {"viz": "kpi.contacts", "pos": [2, 2, 2, 5]},
+    {"viz": "kpi.cr", "pos": [4, 2, 2, 5]},
+    {"viz": "trend.contacts", "pos": [0, 7, 3, 9]},
+    {"viz": "trend.cr", "pos": [3, 7, 3, 9]},
+    {"viz": "region.bars", "pos": [0, 16, 3, 10]},
+    {"viz": "promo.bars", "pos": [3, 16, 3, 10]}
+  ]
+}
