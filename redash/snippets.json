@@ -1,0 +1,27 @@
+[
+  {
+    "trigger": "period_ch",
+    "description": "ClickHouse: фильтр по периоду из параметра period (date-range)",
+    "snippet": "event_date BETWEEN '{{ period.start }}' AND '{{ period.end }}'"
+  },
+  {
+    "trigger": "category_name",
+    "description": "ClickHouse: название категории через словарь (без джойна)",
+    "snippet": "dictGet('marts.dict_categories', 'name', toUInt64(category_id)) AS category"
+  },
+  {
+    "trigger": "region_name",
+    "description": "ClickHouse: название региона через словарь",
+    "snippet": "dictGet('marts.dict_regions', 'name', toUInt64(region_id)) AS region"
+  },
+  {
+    "trigger": "cr",
+    "description": "Конверсия просмотра в контакт (без деления на ноль, без конфликта псевдонимов)",
+    "snippet": "sum(contacts) / nullIf(sum(views), 0) AS cr_view_to_contact"
+  },
+  {
+    "trigger": "prev_period",
+    "description": "ClickHouse: границы текущего и предыдущего периода такой же длины",
+    "snippet": "WITH toDate('{{ period.start }}') AS d1, toDate('{{ period.end }}') AS d2, d1 - (d2 - d1 + 1) AS p1, d1 - 1 AS p2"
+  }
+]

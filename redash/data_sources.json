@@ -1,0 +1,42 @@
+[
+  {
+    "key": "clickhouse",
+    "name": "ClickHouse | события и витрины",
+    "type": "clickhouse",
+    "options": {
+      "url": "http://${REDASH_SOURCE_CH_HOST}:8123",
+      "dbname": "marts",
+      "user": "${CH_USER}",
+      "password": "${CH_PASSWORD}",
+      "timeout": 60,
+      "verify": false
+    }
+  },
+  {
+    "key": "vertica",
+    "name": "Vertica | финансовое DWH",
+    "type": "vertica",
+    "options": {
+      "host": "${REDASH_SOURCE_VERTICA_HOST}",
+      "port": 5433,
+      "user": "${VERTICA_USER}",
+      "password": "${VERTICA_PASSWORD}",
+      "database": "${VERTICA_DB}",
+      "read_timeout": 600,
+      "connection_timeout": 30
+    }
+  },
+  {
+    "key": "trino",
+    "name": "Trino | федерация",
+    "type": "trino",
+    "options": {
+      "protocol": "http",
+      "host": "${REDASH_SOURCE_TRINO_HOST}",
+      "port": 8080,
+      "username": "redash",
+      "catalog": "clickhouse",
+      "schema": "marts"
+    }
+  }
+]
