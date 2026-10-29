@@ -1,0 +1,128 @@
+version: 2
+
+
+models:
+  - name: stg_events
+    description: >
+      События без повторных доставок (ReplacingMergeTree по ключу события + OPTIMIZE FINAL).
+      Основа всех сертифицированных витрин.
+    meta: {owner: bi-team, layer: staging}
+    columns:
+      - name: event_id
+        description: Ключ события; после дедупликации уникален (проверяется в dq_checks_daily.duplicate_share).
+        tests: [not_null]
+      - name: event_type
+        description: Тип события.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['impression', 'view', 'contact', 'favorite']
+      - name: platform
+        description: Платформа клиента.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['android', 'ios', 'web']
+      - name: is_promoted
+        description: 1, если объявление в этот день продвигалось платно.
+
+  - name: dim_category
+    description: Категории с родительской категорией. Источник - продуктовая PostgreSQL.
+    meta: {owner: bi-team, layer: marts}
+    columns:
+      - name: category_id
+        tests: [unique, not_null]
+      - name: parent_category_name
+        description: Название родительской категории (для листовых) или самой категории (для корневых).
+
+  - name: dim_region
+    description: Регионы. Источник — продуктовая PostgreSQL.
+    meta: {owner: bi-team, layer: marts}
+    columns:
+      - name: region_id
+        tests: [unique, not_null]
+
+  - name: fct_listing_daily
+    description: >
+      Объявление и день. Сертифицированная витрина активности объявлений, основа
+      анализа эффективности продвижения (через Trino вместе с заказами из Vertica).
+    meta: {owner: bi-team, certified: true, refresh: "ежечасно, insert_overwrite последних партиций"}
+    tests:
+      - unique_combination:
+          arguments:
+            columns: ['event_date', 'listing_id']
+    columns:
+      - name: event_date
+        description: Дата события (UTC).
+        tests: [not_null]
+      - name: listing_id
+        description: Объявление.
+        tests: [not_null]
+      - name: category_id
+        description: Листовая категория объявления.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_category')
+                field: category_id
+      - name: is_promoted
+        description: 1, если в этот день у объявления было активное платное продвижение.
+      - name: promo_service
+        description: Тип услуги (bump / highlight / premium), пусто без продвижения.
+      - name: impressions
+        description: Показы объявления в выдаче.
+      - name: views
+        description: Открытия карточки объявления.
+      - name: contacts
+        description: Контакты с продавцом (звонок или сообщение). Ключевая метрика ценности для продавца.
+      - name: favorites
+        description: Добавления в избранное.
+      - name: unique_users
+        description: Уникальные пользователи, взаимодействовавшие с объявлением за день. Не суммируется по дням.
+
+  - name: fct_category_daily
+    description: >
+      День, категория, регион, платформа и признак продвижения. Все метрики аддитивны.
+      Источник self-service дашборда Category Deep Dive.
+    meta: {owner: bi-team, certified: true}
+    tests:
+      - unique_combination:
+          arguments:
+            columns: ['event_date', 'category_id', 'region_id', 'platform', 'is_promoted']
+    columns:
+      - name: impressions
+        description: Показы.
+      - name: views
+        description: Просмотры карточек.
+      - name: contacts
+        description: Контакты.
+
+  - name: fct_platform_daily
+    description: "День и платформа. Аудитория и конверсии, основа бизнес-алерта по CR."
+    meta: {owner: bi-team, certified: true}
+    tests:
+      - unique_combination:
+          arguments:
+            columns: ['event_date', 'platform']
+    columns:
+      - name: dau
+        description: Уникальные пользователи за день (точно). Не суммируется по дням.
+      - name: cr_view_to_contact
+        description: Конверсия просмотра в контакт = contacts / views.
+
+  - name: fct_funnel_daily
+    description: Воронка показ - просмотр - контакт по родительским категориям и платформам.
+    meta: {owner: bi-team, certified: true}
+
+  - name: dq_daily_volume
+    description: Объем событий за день против медианы того же дня недели за 4 недели.
+    meta: {owner: bi-team, layer: dq}
+  - name: dq_checks_daily
+    description: Журнал проверок качества данных. Одна строка = проверка и дата.
+    meta: {owner: bi-team, layer: dq}
+    columns:
+      - name: status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['pass', 'warn', 'fail', 'insufficient_history']
