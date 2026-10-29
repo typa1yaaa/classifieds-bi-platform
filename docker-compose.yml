@@ -1,0 +1,118 @@
+x-redash-env: &redash-env
+  REDASH_DATABASE_URL: postgresql://redash:${REDASH_DB_PASSWORD:-redash}@redash-postgres/redash
+  REDASH_REDIS_URL: redis://redis:6379/0
+  REDASH_COOKIE_SECRET: ${REDASH_COOKIE_SECRET:-change-me-cookie-secret}
+  REDASH_SECRET_KEY: ${REDASH_SECRET_KEY:-change-me-secret-key}
+  REDASH_LOG_LEVEL: INFO
+  PYTHONUNBUFFERED: 0
+
+x-redash-base: &redash-base
+  image: redash/redash:25.8.0
+  profiles: [bi]
+  environment: *redash-env
+  depends_on:
+    redash-postgres: { condition: service_healthy }
+    redis: { condition: service_started }
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16
+    profiles: [core]
+    environment:
+      POSTGRES_USER: ${PG_USER:-bi}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-bi}
+      POSTGRES_DB: ${PG_DB:-marketplace}
+    ports: ["5432:5432"]
+    volumes: [pg_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-bi} -d ${PG_DB:-marketplace}"]
+      interval: 5s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    profiles: [core]
+    environment:
+      CLICKHOUSE_USER: ${CH_USER:-bi}
+      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:-bi}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports: ["8123:8123", "9000:9000"]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes: [ch_data:/var/lib/clickhouse]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      retries: 20
+
+  vertica:
+    image: ${VERTICA_IMAGE:-vertica/vertica-ce:24.1.0-0}
+    platform: linux/amd64
+    profiles: [vertica]
+    environment:
+      VERTICA_MEMDEBUG: 2
+    ports: ["5433:5433"]
+    volumes:
+      - vertica_data:/data
+      - ./data:/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/vertica/bin/vsql -U dbadmin -d VMart -c 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
+
+  trino:
+    image: trinodb/trino:476
+    profiles: [fed]
+    ports: ["8080:8080"]
+    volumes:
+      - ./infra/trino/catalog/clickhouse.properties:/etc/trino/catalog/clickhouse.properties:ro
+      - ./infra/trino/catalog/postgresql.properties:/etc/trino/catalog/postgresql.properties:ro
+      - ./infra/trino/catalog/redash.properties:/etc/trino/catalog/redash.properties:ro
+      - ./infra/trino/dwh/${DWH_ENGINE:-postgres}.properties:/etc/trino/catalog/vertica.properties:ro
+
+  redash-postgres:
+    image: postgres:16
+    profiles: [bi]
+    environment:
+      POSTGRES_USER: redash
+      POSTGRES_PASSWORD: ${REDASH_DB_PASSWORD:-redash}
+      POSTGRES_DB: redash
+    ports: ["5434:5432"]
+    volumes: [redash_pg_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redash -d redash"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    profiles: [bi]
+
+  redash-server:
+    <<: *redash-base
+    command: server
+    ports: ["5000:5000"]
+    environment:
+      <<: *redash-env
+      REDASH_WEB_WORKERS: 2
+
+  redash-scheduler:
+    <<: *redash-base
+    command: scheduler
+
+  redash-worker:
+    <<: *redash-base
+    command: worker
+    environment:
+      <<: *redash-env
+      QUEUES: "queries,scheduled_queries,schemas,periodic,emails,default"
+      WORKERS_COUNT: 2
+
+volumes:
+  pg_data:
+  ch_data:
+  vertica_data:
+  redash_pg_data:
