@@ -1,8 +1,6 @@
--- Сверки между системами через Trino. Каждая строка - проверка и число нарушений (ожидается 0).
--- Используется виджетом «Сверки между системами» на дашборде Data Quality.
 SELECT 'orders_without_listing' AS check_name,
-       'DWH и PostgreSQL'   AS systems,
-       COUNT(*)                 AS violations
+       'DWH и PostgreSQL' AS systems,
+       COUNT(*) AS violations
 FROM vertica.finance.promo_orders AS o
 LEFT JOIN postgresql.public.listings AS l ON l.listing_id = o.listing_id
 WHERE l.listing_id IS NULL
@@ -16,7 +14,6 @@ WHERE l.seller_id <> o.seller_id
 
 UNION ALL
 
--- оплаченный заказ активен, у объявления есть события, но трекер не пометил день как продвигаемый
 SELECT 'paid_promo_day_not_flagged', 'DWH и ClickHouse', COUNT(*)
 FROM vertica.finance.promo_orders AS o
 JOIN clickhouse.marts.fct_listing_daily AS f
@@ -29,7 +26,6 @@ WHERE o.status = 'paid'
 
 UNION ALL
 
--- выручка в витрине ClickHouse (после материализации) = выручке в финансовом DWH
 SELECT 'promo_effect_revenue_diff', 'DWH и ClickHouse',
        CAST(ABS(
            (SELECT SUM(amount) FROM vertica.finance.promo_orders WHERE status = 'paid')
