@@ -1,20 +1,20 @@
 SELECT 'orders_without_listing' AS check_name,
        'DWH и PostgreSQL' AS systems,
-       COUNT(*) AS violations
+       CAST(COUNT(*) AS bigint) AS violations
 FROM vertica.finance.promo_orders AS o
 LEFT JOIN postgresql.public.listings AS l ON l.listing_id = o.listing_id
 WHERE l.listing_id IS NULL
 
 UNION ALL
 
-SELECT 'order_seller_mismatch', 'DWH и PostgreSQL', COUNT(*)
+SELECT 'order_seller_mismatch', 'DWH и PostgreSQL', CAST(COUNT(*) AS bigint)
 FROM vertica.finance.promo_orders AS o
 JOIN postgresql.public.listings AS l ON l.listing_id = o.listing_id
 WHERE l.seller_id <> o.seller_id
 
 UNION ALL
 
-SELECT 'paid_promo_day_not_flagged', 'DWH и ClickHouse', COUNT(*)
+SELECT 'paid_promo_day_not_flagged', 'DWH и ClickHouse', CAST(COUNT(*) AS bigint)
 FROM vertica.finance.promo_orders AS o
 JOIN clickhouse.marts.fct_listing_daily AS f
   ON  f.listing_id = o.listing_id
